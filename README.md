@@ -110,3 +110,9 @@ more benchmarks can be found in [benchmarks.md](docs/benchmarks.md)
 
 ## License
 Apache License 2.0
+
+## Contributors
+- [@a710128](https://github.com/a710128)
+- [@spetrel](https://github.com/spetrel) 
+- [@unix1986](https://github.com/unix1986)
+- [@gnap](https://github.com/gnap)

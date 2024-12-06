@@ -1,0 +1,40 @@
+This product includes software from the following projects:
+
+1. FlashAttention (https://github.com/Dao-AILab/flash-attention)
+Licensed under BSD 3-Clause License
+Copyright (c) 2022, the respective contributors, as shown by the AUTHORS file.
+
+The FlashAttention implementation provides fast and memory-efficient exact attention with IO-awareness. 
+The original work was published in the following papers:
+- "FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness"
+  Authors: Tri Dao, Daniel Y. Fu, Stefano Ermon, Atri Rudra, Christopher Ré
+  https://arxiv.org/abs/2205.14135
+
+- "FlashAttention-2: Faster Attention with Better Parallelism and Work Partitioning"
+  Author: Tri Dao
+  https://arxiv.org/abs/2307.08691
+
+2. AWQ (https://github.com/mit-han-lab/llm-awq)
+Licensed under MIT License
+Copyright (c) 2023 MIT HAN Lab
+
+AWQ provides activation-aware weight quantization for LLM compression and acceleration.
+The original work was published in the following paper:
+- "AWQ: Activation-aware Weight Quantization for LLM Compression and Acceleration"
+  Authors: Ji Lin, Jiaming Tang, Haotian Tang, Shang Yang, Xingyu Dang, Song Han
+  https://arxiv.org/abs/2306.00978
+
+3. ExLlamaV2 (https://github.com/turboderp/exllamav2)
+Licensed under MIT License
+Copyright (c) 2023 Thomas Randall
+
+ExLlamaV2 is an inference library for running local LLMs on modern consumer GPUs.
+
+For the complete license texts, please refer to:
+- FlashAttention: https://github.com/Dao-AILab/flash-attention/blob/main/LICENSE
+- AWQ: https://github.com/mit-han-lab/llm-awq/blob/main/LICENSE
+- ExLlamaV2: https://github.com/turboderp/exllamav2/blob/master/LICENSE
+
+Users of this software should note that the BSD 3-Clause License and MIT License require preservation 
+of copyright notices and acknowledgment of the use of the original software in documentation and/or 
+other materials provided with the distribution.

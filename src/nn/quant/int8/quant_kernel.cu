@@ -1,3 +1,5 @@
+// Author: gaojunmin@zhihu.com
+
 #include "nn/quant/int8/quant_kernel.h"
 #include "nn/functions/activation.cuh"
 #include <bmengine/core/core.h>
@@ -256,6 +258,7 @@ core::Tensor quant_scale_back(
     if (scale_y->dtype() != DataType::kFloat) {
         out_type = scale_y->dtype();
     }
+    BM_ASSERT(out_type != DataType::kDouble, "Wrong out_type dtype");
     if (output) {
         BM_ASSERT_EQ(output->size(), input.size(), "Wrong output size()");
         BM_ASSERT_EQ(output->dtype(), out_type, "Wrong output dtype");
@@ -277,7 +280,7 @@ core::Tensor quant_scale_back(
                   << std::endl;
     }
 
-    core::Tensor ret = output ? *output : ctx.tensor(input.size(), scale_y->dtype());
+    core::Tensor ret = output ? *output : ctx.tensor(input.size(), out_type);
     BM_DTYPE_DISPATCH_FLOAT(out_type, {
         if (scale_y->dtype() == DataType::kFloat) {
             KERNEL_quant_scale_back<scalar_t, float><<<gridDim, blockDim, 0, stream>>>(

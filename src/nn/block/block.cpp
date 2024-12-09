@@ -96,6 +96,7 @@ public:
                 block_table,
                 placement,
                 nullptr);
+            BM_ASSERT_EQ(ret.dtype(), dtype, "dtype mismatch");
             if (parallel)
                 ret = ctx.reduce_sum(ret, dtype);
             element_add_scale_out(ctx, inp, ret, ret, 1 / scale, scale_residual); // residual first
@@ -105,6 +106,7 @@ public:
 
         if (!mask_modules[1]) {
             auto ln_out = ln_ff(ctx, ret);
+            BM_ASSERT_EQ(ln_out.dtype(), dtype, "dtype mismatch");
             if (m_ctx && m_ctx->is_calc_act_scales()) {
                 m_ctx->update_act_scale(ln_ff.prefix + ".max_out", ln_out);
             }

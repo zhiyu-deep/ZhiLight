@@ -65,7 +65,7 @@ void copy_to_buffer(
     BM_ASSERT(
         (src.ndim() == 3 && dst.ndim() == 3) || (src.ndim() == 4 && dst.ndim() == 4),
         "src and dst must be 3/4-dimensional");
-    BM_ASSERT(dst.dtype() == dtype, "dst.dtype() != src.dtype()");
+    BM_ASSERT_EQ(dst.dtype(), dtype, "dst.dtype() != src.dtype()");
 
     BM_ASSERT_EQ(src.size(-1), dim_head, "dim mismatch");
     BM_ASSERT_EQ(src.size(-2), num_heads, "dim mismatch");

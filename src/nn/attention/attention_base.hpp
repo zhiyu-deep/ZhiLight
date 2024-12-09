@@ -11,7 +11,6 @@ namespace nn {
 class Attention::impl {
 public:
     class NormalImpl;
-    class Int8Impl;
     class MLAImpl;
     impl() = default;
     virtual ~impl() = default;

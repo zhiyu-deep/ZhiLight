@@ -170,6 +170,7 @@ void BinaryElementwiseOp::inplace(
 
 core::Tensor BinaryElementwiseOp::broadcast_y(
     const core::Context& ctx, const core::Tensor& x, const core::Tensor& y) {
+    BM_ASSERT_EQ(x.dtype(), y.dtype(), "dtype mismatch");
     BM_ASSERT(x.ndim() > 1, "wrong dim");
     if (y.size(-1) == 1) {
         // broadcast last dim

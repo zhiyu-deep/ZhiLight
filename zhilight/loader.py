@@ -148,7 +148,6 @@ def _adapt_qwen2_config(model_config: dict, ext_config: dict):
             "CHUNKED_PREFILL_SIZE": 512,
             "CPM_FUSE_QKV": 1,
             "CPM_FUSE_FF_IN": 1,
-            "INT8_TRT": 1,
         })
         if os.environ.get("CHUNKED_PREFILL", "") == "1":
             _set_envs({

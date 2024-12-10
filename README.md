@@ -28,15 +28,15 @@ CMAKE_BUILD_PARALLEL_LEVEL=32 TESTING=0 python setup.py bdist_wheel
 CMAKE_GENERATER="Ninja" python setup.py bdist_wheel
 
 # Install directly
-cd ./zhilight && pip install -e .
+cd ./ZhiLight && pip install -e .
 
 # Start OpenAI compatible server
 python -m zhilight.server.openai.entrypoints.api_server [options]
 ```
 ## ✈️ Docker Image
-ZhiLight only depends on cuda runtime，cublas，nccl and a few python packages，so you can use standard cuda docker image for build.
+ZhiLight only depends on the CUDA runtime, cuBLAS, NCCL, and a few Python packages in requirements.txt. You can use the image below for running or building it. You can also directly refer to docker/Dockerfile.
 ```bash
-nvidia/cuda:12.5.1-devel-ubuntu20.04
+docker pull ghcr.io/zhihu/zhilight/zhilight:0.4.8-cu124
 ```
 
 ## 📈 Performance Notes

@@ -357,7 +357,6 @@ public:
     bool parallel;
     DistLayout dist_layout;
     int dev;
-    int use_tensorRT;
 
     cublasLtMatmulDesc_t matmul_desc;
 
@@ -393,7 +392,6 @@ public:
           parallel(parallel),
           dist_layout(weight_transposed ? dist_layout : transpose_layout(dist_layout)),
           dev(ctx.active_device_idx()) {
-        use_tensorRT = utils::get_int_env("INT8_TRT", 0);
         BM_ASSERT(quant >= 0 && quant <= 2, "Wrong quant " + std::to_string(quant));
 
         BM_CUBLAS_ASSERT(cublasLtMatmulDescCreate(&matmul_desc, CUBLAS_COMPUTE_32I, CUDA_R_32I));
@@ -452,8 +450,7 @@ public:
                 multiply(ctx, w_scale, 1.0 / sqrt(dim_in), &w_scale2);
                 w_scale = w_scale2;
             }
-            DataType scale_dtype = (use_tensorRT == 0) ? dtype : DataType::kFloat;
-            weight_scale = functions::typecast(ctx, w_scale, scale_dtype);
+            weight_scale = functions::typecast(ctx, w_scale, dtype);
             auto bias_layout = dist_layout == DistLayout::ROW ? DistLayout::COLUMNAR : DistLayout::REPLICATED;
             if (has_bias) {
                 name = prefix + ".bias";
@@ -489,11 +486,11 @@ public:
             BM_ASSERT(input_quant.quant_scale, "quant tensor has no scale");
         } else if (!input.quant_scale) {
             core::EventScope event_scope(ctx, "quant_calc_scale");
-            BM_ASSERT(input.dtype() == dtype, "Input data type mismatch1. input.dtype: " + std::string(get_data_type_name(input.dtype())));
+            BM_ASSERT_EQ(input.dtype(), dtype, "Input data type mismatch1.");
             input_quant = int8_op::quant_calc_scale(ctx, input);
             int8_op::set_quant_scale(const_cast<Tensor&>(input), input_quant);
         } else {
-            BM_ASSERT(input.dtype() == core::DataType::kInt8, "Input data type mismatch2");
+            BM_ASSERT_EQ(input.dtype(), core::DataType::kInt8, "Input data type mismatch2");
             input_quant = input;
         }
         input_scale = *input_quant.quant_scale;
@@ -542,7 +539,7 @@ public:
             return ret;
         }
         core::EventScope event_scope(ctx, "quant_scale_back");
-        ret = int8_op::quant_scale_back(ctx, ret, &input_scale, &weight_scale);
+        ret = int8_op::quant_scale_back(ctx, ret, &input_scale, &weight_scale, dtype);
         if (has_bias) {
             ret = add_bias(ctx, ret, bias);
         }

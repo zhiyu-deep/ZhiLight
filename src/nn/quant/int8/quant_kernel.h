@@ -30,7 +30,7 @@ core::Tensor quant_scale_back(
     const core::Tensor& input,   // [m, n]
     const core::Tensor* scale_x, // [m]
     const core::Tensor* scale_y, // [n]
-    core::DataType out_type = core::DataType::kFloat,
+    core::DataType out_type = core::DataType::kDouble,
     core::Tensor* output = nullptr
 );
 

@@ -166,6 +166,7 @@ public:
                 w_1.quant_scale.get(),
                 w_gated.get_weight_scale(),
                 act_fn_type);
+            BM_ASSERT_EQ(ret.dtype(), dtype, "dtype mismatch");
         }
 
         Tensor output = w_out.forward(ctx, ret, parallel || !quant.fuse_block() || quant_back);

@@ -7,7 +7,7 @@
 * Asynchronous OpenAI compatible interface adapted from vllm
 * Custom defined tensor and unified global memory management
 * 🔥 Encode and all-reduce overlap, we named "dual streams"
- ** Support Int8-quantized all-reduce to furture reduce all-reduce cost.   
+   * Support Int8-quantized all-reduce to furture reduce all-reduce cost.   
 * Host all-reduce based on SIMD instructions
 * Optimized fused kernels, qkv, residual & layernorm etc.
 * 🔥 Fused batch attention for decoding based on tensor core instructions

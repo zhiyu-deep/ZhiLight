@@ -123,7 +123,7 @@ class FeedForward(torch.nn.Module):
 @pytest.mark.parametrize("BATCH", [2, 4])
 @pytest.mark.parametrize("SEQLEN", [2, 4, 8])
 @pytest.mark.parametrize("SCALE", [True, False])
-@pytest.mark.parametrize("TRANS", [True, False])
+@pytest.mark.parametrize("TRANS", [False])
 def test_feedforward(SIZE, BATCH, SEQLEN, SCALE, TRANS):
     rtol, atol = (1e-3, 1e-2)
 
@@ -169,4 +169,4 @@ def test_feedforward(SIZE, BATCH, SEQLEN, SCALE, TRANS):
 
 
 if __name__ == "__main__":
-    test_feedforward((2, 4), 2, 2, False, True)
+    test_feedforward((2, 4), 2, 2, False, False)

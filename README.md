@@ -13,7 +13,7 @@
 * 🔥 Fused batch attention for decoding based on tensor core instructions
 * Support TP and PP on one node, TP is recommended
 * Support dynamic batch
-* Support flashatten prefill
+* Support flash attention prefill 
 * Support chunked prefill
 * Support prefix cache
 * Support Native INT8/SmoothQuant/FP8/AWQ/GPTQ quantization

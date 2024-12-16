@@ -83,6 +83,7 @@ void load_state_dict(
     std::map<const std::string, bmengine::core::Tensor*> named_params,
     bool parallel) {
     for (auto it : named_params) {
+        BM_ASSERT(it.second, it.first + std::string(" not in named_params"));
         auto p = state_dict.find(it.first);
         if (p != state_dict.end()) {
             if (!parallel || ctx.rank() == 0) {

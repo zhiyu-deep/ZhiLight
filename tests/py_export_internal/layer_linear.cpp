@@ -1,3 +1,7 @@
+#include "bind_internal.h"
+#include "internal_utils.h"
+#include "layer_base.hpp"
+
 #include "nn/nn.h"
 #include "model/model.h"
 #include "utils/exception.h"
@@ -10,10 +14,6 @@
 #include <tuple>
 #include <iostream>
 #include <random>
-
-#include "bind_internal.h"
-#include "internal_utils.h"
-#include "layer_base.hpp"
 
 namespace py = pybind11;
 using namespace bmengine;

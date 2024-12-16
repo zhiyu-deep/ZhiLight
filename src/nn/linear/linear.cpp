@@ -220,9 +220,7 @@ public:
             weight_transposed ? dim_in : dim_out, // W^T
             weight_transposed ? dim_out : dim_in  // W
         });
-        if (!parallel) {
-            weight = std::make_unique<Tensor>(ctx.parameter(shape, dtype));
-        }
+        weight = std::make_unique<Tensor>(ctx.parameter(shape, dtype));
         if (ctx.high_precision() >= 1) {
             gemm_A_B.set_compute_type(CUBLAS_COMPUTE_32F);
             gemm_A_Btrans.set_compute_type(CUBLAS_COMPUTE_32F);

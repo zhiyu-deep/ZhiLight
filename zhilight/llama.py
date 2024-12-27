@@ -22,7 +22,8 @@ from typing import (
 )
 from transformers import AutoTokenizer
 from typing_extensions import TypedDict
-from .config import DistConfig
+from .config.adapter import ModelAdapter
+from .config.dist_config import DistConfig
 from .loader import ModelLoader, LLaMALoader
 from .dynamic_batch import DynamicBatchConfig, GeneratorArg, DynamicBatchGenerator
 from .quant import QuantConfig, QuantType, quant_config_to_c
@@ -125,7 +126,7 @@ class LLaMA:
         tokenizer=None,
         **kwargs
     ):
-        self._config = _get_config(LLaMALoader.adapt_hf_config(model_config))
+        self._config = _get_config(ModelAdapter.adapt(model_config))
         self._quant_config = QuantConfig.adapt_hf_config(quant_config, self._config)
         dist_config = DistConfig.adapt(parallel)
         print(f"dist_config: parallel={dist_config.parallel}")

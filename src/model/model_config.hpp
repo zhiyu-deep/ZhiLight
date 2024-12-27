@@ -27,13 +27,15 @@ struct ModelConfig {
     int vocab_size;
     float eps;
     int num_kv_heads;
-    std::vector<std::vector<bool>> mask_modules;
-    bool scale_weights;
-    bool weight_transposed;
-    int dim_model_base; // cpm dragonfly
-    float scale_emb; // cpm dragonfly
-    float scale_depth; // cpm dragonfly
     core::DataType dtype;
+
+    std::vector<std::vector<bool>> mask_modules;
+    bool scale_weights { false };
+    bool weight_transposed { false };
+    int dim_model_base { 0 }; // cpm dragonfly
+    float scale_emb { 1. }; // cpm dragonfly
+    float scale_depth { 1. }; // cpm dragonfly
+
     std::string pos_bias_type { "rotary" };
     std::string activate_fn { "silu" };
     bool tie_lm_head { false };  // Whether the model's input and output embeddings should be tied.
@@ -71,12 +73,6 @@ struct ModelConfig {
         int vocab_size,
         float eps = 1e-6,
         int num_kv_heads = -1,
-        const std::vector<std::vector<bool>>& mask_modules = {},
-        bool scale_weights = false,
-        bool weight_transposed = false,
-        int dim_model_base = 256,
-        float scale_depth = 1.4,
-        float scale_emb = 12,
         core::DataType dtype = core::DataType::kHalf)
         : model_type(model_type),
           num_layers(num_layers),
@@ -87,12 +83,6 @@ struct ModelConfig {
           vocab_size(vocab_size),
           eps(eps),
           num_kv_heads(num_kv_heads == -1 ? num_heads : num_kv_heads),
-          mask_modules(mask_modules),
-          scale_weights(scale_weights),
-          weight_transposed(weight_transposed),
-          dim_model_base(dim_model_base),
-          scale_depth(scale_depth),
-          scale_emb(scale_emb),
           dtype(dtype) {
         this->mask_modules.resize(num_layers);
         for (auto& it : this->mask_modules) {

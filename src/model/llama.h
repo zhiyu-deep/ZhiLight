@@ -3,6 +3,8 @@
 #include "model/model.h"
 #include "model/model_context.h"
 #include "nn/nn.h"
+#include "nn/position/rope_preparer.h"
+#include <memory>
 
 namespace model {
 
@@ -56,6 +58,7 @@ private:
     nn::LayerNorm ln_after_enc;
     nn::RawEmbedding lm_head;
     nn::RawEmbedding token_embedding;
+    std::unique_ptr<nn::RopePreparer> rope_preparer;
 
     BM_LAYER_DEF_PUBLIC(LLaMA);
 

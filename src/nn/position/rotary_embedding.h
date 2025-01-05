@@ -48,4 +48,17 @@ void rotary_embedding_qk(
     core::DataType dtype
 );
 
+void rope_qk_cache(
+    const core::Context& ctx,
+    const core::Tensor& cos, // (seq_len, dim_head)
+    const core::Tensor& sin, // (seq_len, dim_head)
+    const core::Tensor& in,  // (seq_len, all_num_heads * dim_head)
+    core::Tensor& out_q,     // (seq_len, num_heads * dim_head)
+    core::Tensor& out_k,     // (seq_len, num_kv_heads * dim_head)
+    core::Tensor& out_v,     // (seq_len, num_kv_heads * dim_head)
+    size_t num_heads,
+    size_t num_kv_heads,
+    size_t dim_head,
+    core::DataType dtype
+);
 }

@@ -812,7 +812,15 @@ Tensor Attention::impl::NormalImpl::dynamic_batch_forward(
         // fuse Q, K, V
         auto a = linear_qkv->forward(ctx, hidden_q); // (group_len_q, (num_heads + 2 * num_kv_heads) * dim_head)
         BM_ASSERT_EQ(a.size(-1), (num_heads + 2 * num_kv_heads) * dim_head, "");
-        if (rotary_embedding.is_normal()) {
+        if (dyn_batch->rope_cache.cos.numel() > 0) {
+            if (ctx.is_layer(1000)) std::cout << "rope_qk_cache\n";
+            rope_qk_cache(ctx,
+                          dyn_batch->rope_cache.cos,
+                          dyn_batch->rope_cache.sin,
+                          a,
+                          g_h_q, g_h_k, g_h_v,
+                          num_heads, num_kv_heads, dim_head, dtype);
+        } else if (rotary_embedding.is_normal()) {
         rotary_embedding_qk(ctx, position_bias, a, g_h_q, g_h_k, g_h_v, num_heads, num_kv_heads, dim_head, rope_theta, dtype);
         } else {
             // if (ctx.is_layer(1)) std::cout << "Split to rotary_embedding\n";

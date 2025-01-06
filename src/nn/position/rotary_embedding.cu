@@ -3,6 +3,8 @@
 #include "bmengine/functions/utils.cuh"
 #include "bmengine/functions/transpose.h"
 #include "bmengine/logger/std_log_op.hpp"
+#include "model/dyn_batch_context.h"
+#include "model/model_context.h"
 #include <numeric>
 #include <assert.h>
 
@@ -92,6 +94,38 @@ static __global__ void KERNEL_rotary_emb_NOT_neox(
     } else {
         *reinterpret_cast<int *>(&g_out[dst_offset + i * 2]) = *reinterpret_cast<int *>(&out);
     }
+}
+
+// gridDim (seq_len, num_heads),   blockDim (dim_head)
+template<typename T>
+static __global__ void KERNEL_rope_with_cache(
+    const float *__restrict__ g_cos, // (seq_len, dim_head)
+    const float *__restrict__ g_sin, // (seq_len, dim_head)
+    const T* __restrict__ in,        // (seq_len, num_heads, dim_head)
+    T* __restrict__ g_out,           // (seq_len, num_heads, dim_head)
+    uint32_t src_stride1,
+    uint32_t src_stride2,
+    uint32_t dst_stride1,
+    uint32_t dst_stride2,
+    bool neox_style=true) {
+    int dim_head = blockDim.x;
+    int col = threadIdx.x;
+    int half_dim = dim_head / 2;
+
+    size_t src_offset = size_t(blockIdx.x) * src_stride1 + blockIdx.y * src_stride2 + col;
+    size_t dst_offset = size_t(blockIdx.x) * dst_stride1 + blockIdx.y * dst_stride2 + col;
+
+    float cos_freq = g_cos[blockIdx.x * dim_head + col];
+    float sin_freq = g_sin[blockIdx.x * dim_head + col];
+
+    // neox_style
+    float t;
+    if (col < half_dim) {
+        t = float(in[src_offset]) * cos_freq - float(in[src_offset + half_dim]) * sin_freq;
+    } else {
+        t = float(in[src_offset]) * cos_freq + float(in[src_offset - half_dim]) * sin_freq;
+    }
+    g_out[dst_offset] = t;
 }
 
 class RotaryEmbedding::impl {
@@ -217,13 +251,71 @@ public:
         }
     }
 
+    void rotate_with_cache(
+        const core::Context& ctx,
+        const core::Tensor& cos, // (batch? seq_len, dim_head)
+        const core::Tensor& sin, // (batch? seq_len, dim_head)
+        const core::Tensor& q,   // (batch? seq_len, dim_model) or (batch?, seq_len, num_heads, dim_head)
+        core::Tensor& out_q
+    ) {
+        BM_ASSERT_EQ(core::DataType::kFloat, cos.dtype(), "dtype mismatch");
+        BM_ASSERT_EQ(sin.shape(), cos.shape(), "shape mismatch");
+        BM_ASSERT(q.ndim() <= cos.ndim() + 1, "Dim mismatch");
+        BM_ASSERT(q.size(-1) % dim_head == 0, "dim_model mismatch");
+        BM_ASSERT_EQ(q.size(0), cos.size(0), "batch or seq_len mismatch");
+        if (cos.ndim() == 3)
+            BM_ASSERT_EQ(q.size(1), cos.size(1), "seq_len mismatch");
+        if (q.ndim() == cos.ndim() + 1)
+            BM_ASSERT_EQ(q.size(-1), dim_head, "dim_head mismatch");
+
+        uint32_t src_stride1 = q.stride(-2);
+        uint32_t src_stride2 = dim_head;
+        uint32_t dst_stride1 = out_q.stride(-2);
+        uint32_t dst_stride2 = dim_head;
+        if (q.ndim() == cos.ndim() + 1) {
+            src_stride1 = q.stride(-3);
+            src_stride2 = q.stride(-2);
+            dst_stride1 = out_q.stride(-3);
+            dst_stride2 = out_q.stride(-2);
+        }
+
+        size_t seq_len = cos.numel() / cos.size(-1);
+        size_t num_heads = (q.ndim() == cos.ndim() + 1) ? q.size(-2) : (q.size(-1) / dim_head);
+        if (ctx.is_layer(1000)) {
+            std::cout << "seq_len: " << seq_len << std::endl;
+            std::cout << "num_heads: " << num_heads << std::endl;
+        }
+        {
+            dim3 gridDim(seq_len, num_heads);
+            auto stream = ctx.current_stream()->ptr;
+            BM_DTYPE_DISPATCH_HALF(q.dtype(), {
+                KERNEL_rope_with_cache<<<gridDim, dim_head, 0, stream>>>(
+                    cos.data<float>(),
+                    sin.data<float>(),
+                    q.data<scalar_t>(),
+                    out_q.data<scalar_t>(),
+                    src_stride1, src_stride2, dst_stride1, dst_stride2
+                );
+            });
+            BM_CUDART_ASSERT(cudaGetLastError());
+        }
+    }
+
     Tensor rotate(
         const core::Context& ctx,
         const core::Tensor& pos, // (batch, seq_len)
         const core::Tensor& q,   // (batch, seq_len, dim_model)
         core::Tensor* output
         ) override {
+        auto m_ctx = model::ModelContext::cast(ctx);
         auto out_q = output ? *output : ctx.tensor(q.size(), q.dtype());
+        if (m_ctx && m_ctx->dyn_batch() && m_ctx->dyn_batch()->rope_cache.cos.numel() > 0) {
+            auto& cos = m_ctx->dyn_batch()->rope_cache.cos;
+            auto& sin = m_ctx->dyn_batch()->rope_cache.sin;
+            // if (ctx.is_layer(0)) std::cout << "rotate_with_cache\n";
+            rotate_with_cache(ctx, cos, sin, q, out_q);
+            return out_q;
+        }
         if (!neox_style) {
             rotate_NOT_neox_style(ctx, pos, q, out_q);
             return out_q;

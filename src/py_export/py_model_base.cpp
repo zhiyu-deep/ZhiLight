@@ -57,7 +57,7 @@ std::shared_ptr<Engine> create_engine(int device_id, size_t memory_limit, int tp
         BM_CUDART_ASSERT(cudaSetDevice(device_id < 0 ? 0 : device_id));
         BM_CUDART_ASSERT(cudaMemGetInfo(&free, &total));
         size_t def_reserve_mem = free > (36UL << 30UL) ? 1700 : 1024;
-        size_t reserve_mem = utils::get_int_env("CPM_RESERVE_MEM_MB", def_reserve_mem);
+        size_t reserve_mem = utils::get_int_env("RESERVE_MEM_MB", def_reserve_mem);
         memory_limit = free - (reserve_mem << 20L);
     }
 

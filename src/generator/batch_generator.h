@@ -41,9 +41,11 @@ struct SearchTask_ {
     volatile bool canceled { false };
     long begin_ts { 0 };
     long first_token_delay_ms { 0 };
-    // bee fields
-    std::vector<int> ext_ids;
-    std::vector<int> ext_sub;
+
+    std::vector<int> position_ids;  // passed-in position ids of 'PROMPT'
+    bmengine::core::Tensor input_embeddings;  // passed-in embeddings of 'PROMPT', device=CPU
+    int position_delta { 0 };  // for multi-modal model
+
 public:
     void finish(generator::SearchResults&& results);
     void update_stream(const generator::SearchResults& results);

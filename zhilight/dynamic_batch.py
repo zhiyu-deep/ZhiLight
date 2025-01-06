@@ -26,8 +26,8 @@ class DynamicBatchConfig:
             unk_id=0,
             first_batch=1,
             sort_by_len=0,
-            nccl=-1,  # -1: auto; 0; disabled; 1: enable
-            rag_buffer=True,
+            nccl=-1,  # deprecated, always True
+            rag_buffer=True,  # deprecated, always True
             ignore_eos=False,
             keep_eos=False,
             reserved_work_mem_mb=int(os.environ.get("reserved_work_mem_mb", 1250)),
@@ -184,41 +184,6 @@ class GenerativeOutput:
                 f"time_elapsed={self.time_elapsed})")
 
 
-class CPMBeeOutput(GenerativeOutput):
-    def __init__(self, res_dict, answer, score, time_elapsed, input_tokens_num, output_tokens_num):
-        super().__init__([], score, time_elapsed)
-        # CPMBee full output is a dict; simple output is answer
-        self.res_dict = res_dict
-        self.text = answer
-        self.input_tokens_num = input_tokens_num
-        self._output_tokens_num = output_tokens_num
-
-    def decode(self, tokenizer, prefix_input=None):
-        if bool(prefix_input) and not bool(self.res_dict):
-            assert isinstance(prefix_input, dict), "CPMBee input should be a dict"
-            self.res_dict = prefix_input.copy()
-            self.res_dict['<ans>'] = self.text
-            self.res_dict['score'] = self.score
-        return self
-
-    def __repr__(self) -> str:
-        if self.res_dict is not None:
-            return (f"CPMBeeOutput(res_dict={self.res_dict}, "
-                    f"input_tokens_num={self.input_tokens_num}, "
-                    f"output_tokens_num={self.output_tokens_num}, "
-                    f"time_elapsed={self.time_elapsed})")
-        else:
-            return (f"CPMBeeOutput(<ans>='{repr(self.text)}', "
-                    f"score={self.score}, "
-                    f"input_tokens_num={self.input_tokens_num}, "
-                    f"output_tokens_num={self.output_tokens_num}, "
-                    f"time_elapsed={self.time_elapsed})")
-
-    @property
-    def output_tokens_num(self):
-        return self._output_tokens_num
-
-
 def _convert_output(t) -> GenerativeOutput:
     """
      @:param t from c++ implementation: py_batch_generator.cpp convert_output_to_py()
@@ -226,18 +191,8 @@ def _convert_output(t) -> GenerativeOutput:
     if isinstance(t, tuple):
         # LLaMA result
         return GenerativeOutput(t[0], t[1], t[2], t[3], t[4])
-    elif isinstance(t, str):
-        # CPMBee result is a dict
-        res_dict: dict = json.loads(t)
-        input_tokens_num: int = res_dict.pop("input_tokens_num")
-        output_tokens_num: int = res_dict.pop("output_tokens_num")
-        time_elapsed: float = res_dict.pop("time_elapsed")
-        answer = res_dict['<ans>']
-        return CPMBeeOutput(res_dict, answer, res_dict['score'], time_elapsed, input_tokens_num, output_tokens_num)
     else:
-        # CPMBee result is answer only
-        assert isinstance(t, list), "result should be a list"
-        return CPMBeeOutput(None, t[0], t[1], t[2], t[3], t[4])
+        raise RuntimeError("Unexpected type")
 
 
 class RequestResult:
@@ -429,12 +384,14 @@ class DynamicBatchGenerator:
         self._do_verify = int(os.environ.get("VERIFY_MAX_TOKEN", 1)) > 0
         if self._do_verify:
             self.start()
-            self.generate_c([888] * (config.max_total_token - 1), GeneratorArg(max_length=1))
+            arg = GeneratorArg(max_length=1)
+            task = self.to_c_task([888] * (config.max_total_token - 1), arg)
+            self.generate_c(task, arg)
             self._do_verify = False
             print("Done Verify max_token")
 
     @staticmethod
-    def to_c_task(input_tokens: List[int], arg: GeneratorArg, stream=0):
+    def to_c_task(input_tokens: List[int], arg: GeneratorArg, stream=0) -> C.SearchTask:
         return C.SearchTask(
             input_tokens,
             arg.beam_size,
@@ -457,39 +414,8 @@ class DynamicBatchGenerator:
         if queue_size > self.print_queue_threshold:
             logging.warning(f"High pressure: active_size={self._c_generator.active_size()} queue_size={queue_size}")
 
-    def generate_c(
-        self,
-        input_tokens: List[int],
-        arg: GeneratorArg,
-        block: bool = True,
-        timeout: float = 0,
-    ) -> RequestResult:
-        if self._thread is None:
-            raise RuntimeError("Not started")
-
-        if arg.num_results > self.config.max_beam_size:
-            raise ValueError(f"arg.num_results {arg.num_results} is too big.")
-
-        c_task = self.to_c_task(input_tokens, arg)
-
-        self.check_queue_busy()
-        if not self._c_generator.submit(c_task, block):
-            raise RuntimeError("Generator is busy")
-
-        c_result = c_task.get_result(timeout)
-
-        return RequestResult.from_cpp_stream_result(None, c_result, c_task.input_tokens_num())
-
-    def _encode(self, data: Union[str, dict, List[dict]]) -> Union[List[int], str]:
-        """
-        LLaMA: str -> token ids
-        CPMBee: dict -> json string (serialized)
-        """
-        if self._is_bee:
-            if isinstance(data, str):
-                return json.dumps({'input': data, '<ans>': ''}, ensure_ascii=False)
-            return json.dumps(data, ensure_ascii=False)
-        elif (
+    def _encode(self, data: Union[str, List[dict]]) -> List[int]:
+        if (
             isinstance(data, list)
             and isinstance(data[0], dict)
             and hasattr(self._tokenizer, "apply_chat_template")
@@ -503,6 +429,24 @@ class DynamicBatchGenerator:
             input_tokens = self._tokenizer.encode(data)
         return input_tokens
 
+    def _process_inputs(self, data: Union[str, dict, List[dict]], arg: GeneratorArg, stream=0):
+        t = self.model.process_inputs(data)
+        if t is not None:
+            # multi-modal model, feed extra fields
+            ids, position_ids, embeddings, pos_delta = t
+            c_task = self.to_c_task(ids, arg, stream=stream)
+            if position_ids is not None:
+                c_task.set_position_ids(position_ids)
+            if embeddings is not None:
+                assert 0 == int(os.environ.get("CHUNKED_PREFILL", 0)), "Feed embeddings with chunking is not supported."
+                c_task.set_input_embeddings(embeddings)
+            if pos_delta is not None:
+                c_task.set_position_delta(pos_delta)
+            return c_task, ids
+        else:
+            input_tokens = self._encode(data)
+            return self.to_c_task(input_tokens, arg), input_tokens
+
     def generate(
         self,
         data: Union[str, dict, List[dict]],
@@ -511,53 +455,46 @@ class DynamicBatchGenerator:
         prepend_input: bool = False,
         timeout: float = 0,
     ):
-        input_tokens = self._encode(data)
+        c_task, _ = self._process_inputs(data, arg)
 
-        req_result = self.generate_c(input_tokens, arg, block, timeout=timeout)
+        req_result = self.generate_c(c_task, arg, block, timeout=timeout)
 
         for output in req_result.outputs:
             output.decode(self._tokenizer, data if prepend_input else None)
 
         return req_result
 
-    def beam_search(
+    def generate_c(
         self,
-        data: str,
-        arg: GeneratorArg = GeneratorArg(),
+        c_task: C.SearchTask,
+        arg: GeneratorArg,
         block: bool = True,
-        prepend_input: bool = False,
-        fetch_tokens_level: int = 0,
-    ):
-        # deprecated, use generate()
-        input_tokens = self._encode(data)
+        timeout: float = 0,
+    ) -> RequestResult:
+        if self._thread is None:
+            raise RuntimeError("Not started")
 
-        req_result = self.generate_c(input_tokens, arg, block)
+        if arg.num_results > self.config.max_beam_size:
+            raise ValueError(f"arg.num_results {arg.num_results} is too big.")
 
-        for output in req_result.outputs:
-            output.decode(self._tokenizer, data if prepend_input else None)
+        self.check_queue_busy()
+        if not self._c_generator.submit(c_task, block):
+            raise RuntimeError("Generator is busy")
 
-        out0 = req_result.outputs[0]
-        if self._is_bee:
-            output = out0.res_dict
-        else:
-            output = out0.text
+        c_result = c_task.get_result(timeout)
 
-        if fetch_tokens_level == 1:
-            return output, out0.time_elapsed, req_result.input_tokens_num, out0.output_tokens_num
-        else:
-            return output, out0.time_elapsed
+        return RequestResult.from_cpp_stream_result(None, c_result, c_task.input_tokens_num())
 
     def stream_generate(
         self,
-        data: str,
+        data: Union[str, List[dict]],
         arg: GeneratorArg,
         block: bool = True,
         handler_cls=StreamHandler,
     ):
         if self._thread is None:
             raise RuntimeError("Not started")
-        input_tokens = self._encode(data)
-        task = self.to_c_task(input_tokens, arg, True)
+        task, input_tokens = self._process_inputs(data, arg, True)
 
         self.check_queue_busy()
         if not self._c_generator.submit(task, block):
@@ -565,10 +502,6 @@ class DynamicBatchGenerator:
 
         h = handler_cls(task, arg, input_tokens, self._tokenizer)
         return h
-
-    def stream_beam_search(self, *args, **kwargs):
-        # deprecated, use stream_generate()
-        return self.stream_generate(*args, **kwargs)
 
     def batch_generate_c(
         self,

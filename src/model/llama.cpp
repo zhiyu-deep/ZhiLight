@@ -83,9 +83,11 @@ core::Tensor LLaMA::encode(
     const core::Tensor& hidden_pass, // half (batch, len_q, dim_model)
     bool ln_output) {
     ctx.set_current_layer(-1);
-    Tensor hidden = hidden_pass;
+    Tensor hidden;
     if (hidden_pass.empty()) {
         hidden = token_embedding(ctx, ids);
+    } else {
+        hidden = functions::typecast(ctx, hidden_pass, dtype);
     }
     if (rope_preparer && ctx.dyn_batch()) {
         auto& rope_cache = ctx.dyn_batch()->rope_cache;
@@ -130,6 +132,12 @@ core::Tensor LLaMA::encode(
     if (ctx.dyn_batch())
         ctx.dyn_batch()->rope_cache.clear();
     return hidden;
+}
+
+core::Tensor LLaMA::get_input_embeddings(
+    ModelContext& ctx, const core::Tensor& ids) {
+    ctx.set_current_layer(-1);
+    return token_embedding.forward(ctx, ids);
 }
 
 core::Tensor LLaMA::get_logits(ModelContext& ctx, const core::Tensor& hidden, bool ln_input) {

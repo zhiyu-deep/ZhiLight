@@ -146,6 +146,22 @@ class LLaMA:
             dist_config.parallel,
         )
 
+    def process_inputs(self, messages: List[dict]):
+        debug_feed_embedding = False
+        if debug_feed_embedding:
+            print("#################### process_inputs")
+            prompt = self._tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+            token_ids = self._tokenizer.encode(prompt, add_special_tokens=False)
+            positions = list(range(0, len(token_ids)))
+            inputs_embeds = self._model.get_input_embeddings(token_ids)
+            # TODO: define a class instead of returning dict
+            return (token_ids,
+                    positions,
+                    inputs_embeds,
+                    None,
+                    )
+        return None
+
     def _load_tokenizer_config(self, model_path: str):
         tokenizer_config_path = f"{model_path}/tokenizer_config.json"
         if os.path.exists(tokenizer_config_path):

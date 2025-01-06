@@ -14,16 +14,23 @@ using bmengine::core::DataType;
 using bmengine::core::Tensor;
 
 // Create a tensor reference to numpy array's underlying data.
-// No data coping happens.
-const Tensor numpy_to_tensor(const std::string& name, const py::array& arr) {
+// No data coping happens if copy==false.
+Tensor numpy_to_tensor(const std::string& name, const py::array& arr, bool copy) {
     py::format_descriptor<float>::format();
     py::buffer_info buf = arr.request();
     auto dtype = numpy_dtype_to_bmengine(arr.dtype());
-    const auto tensor = Tensor::from_external(
+    void* ptr = buf.ptr;
+    if (copy) {
+        ptr = new char[arr.nbytes()];
+        memcpy(ptr, buf.ptr, arr.nbytes());
+    }
+    auto tensor = Tensor::from_external(
         *reinterpret_cast<std::vector<size_t>*>(&buf.shape),
         dtype,
-        buf.ptr,
-        arr.nbytes());
+        ptr,
+        arr.nbytes(),
+        -1,
+        copy);
     tensor.set_name(name);
     return std::move(tensor);
 }

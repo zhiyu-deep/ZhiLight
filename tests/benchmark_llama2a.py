@@ -61,6 +61,8 @@ def simulate_qps_generate(generator: DynamicBatchGenerator, s_qps, input_texts, 
     time_elapses = []
     begin_ts = time.time()
 
+    # todo: 模拟1个用户请求, 得到该用户的延时情况.
+    #   进一步统计: 1. 截止到当前用户结束的qps, 2. 截至到当前用户的百分位情况.
     def gen(i, txt):
         req_res = generator.generate(txt, arg=arg)
         with lock:
@@ -187,7 +189,7 @@ if __name__ == "__main__":
     parser.add_argument("--temperature", type=float, default=1.0)
     parser.add_argument("--seed", type=int, default=1)
 
-    parser.add_argument("--simulate_qps", type=float, default=0)
+    parser.add_argument("--simulate_qps", type=float, default=0)  # todo: 表示模拟用户场景, 每秒多少query数, 用来控制query发射的频率.
     parser.add_argument("--first_delay", type=int, default=0)
 
     args = parser.parse_args()
